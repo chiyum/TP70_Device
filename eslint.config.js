@@ -48,13 +48,17 @@ export default tseslint.config({
   rules: {
     semi: ["warn", "always"], // 要求使用分號，違反時警告
     "comma-dangle": ["error", "never"], // 禁止使用尾隨逗號
-    "no-unused-vars": 2, // 禁止未使用的變量（錯誤級別）
     "space-before-function-paren": 0, // 關閉函數括號前的空格規則
     "generator-star-spacing": "off", // 關閉生成器函數 * 的空格規則
     "object-curly-spacing": 0, // 關閉對象字面量大括號內的空格規則
     "array-bracket-spacing": 0, // 關閉數組括號內的空格規則
     "vue/multi-word-component-names": "off", // 關閉 Vue 組件需要多單詞名稱的規則
+    "no-unused-vars": "off", // 關閉未使用變量的規則 讓 TypeScript ESLint 接管
     "@typescript-eslint/no-explicit-any": "off", // 允許使用 any 類型
-    "prettier/prettier": "error" // 啟用 Prettier 規則，違反時報錯
+    "prettier/prettier": "error", // 啟用 Prettier 規則，違反時報錯
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }
+    ]
   }
 });
