@@ -25,4 +25,9 @@ body {
     align-items: center;
     justify-content: space-between;
   }
+  &-state {
+    &-text {
+      font-size: 1rem;
+    }
+  }
 }

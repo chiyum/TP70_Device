@@ -2,7 +2,6 @@
 import {
   CashDepositMachine,
   BillValidator,
-  BillStorage,
   ConsoleDisplay
 } from "@/services/deposit";
 import {
@@ -30,7 +29,9 @@ const AMOUNT_CODES = {
 const SEND_ACTION_CODES = {
   confirm: "02", // 確認入鈔 or 啟動
   cancel: "0F", // 退鈔
-  pending: "18" // 讓入鈔機等待指令
+  pending: "18", // 讓入鈔機等待指令
+  close: "5E", // 關閉連接
+  reOpen: "3E" // 重新開啟連接
 };
 
 interface State {
@@ -40,6 +41,7 @@ interface State {
   port: any; // 串行端口
   reader: any; // 串行讀取器
   currentPendingAmount: number; // 當前等待確認的金額
+  totalAmount: number; // 存入總金額
 }
 
 const state: State = reactive({
@@ -48,7 +50,8 @@ const state: State = reactive({
   state: "off",
   port: null as any,
   reader: null as any,
-  currentPendingAmount: 0
+  currentPendingAmount: 0,
+  totalAmount: 0
 });
 
 const depositMachine = ref();
@@ -143,6 +146,41 @@ const startReading = async () => {
   }
 };
 
+// const closeConnection = async () => {
+//   sendMessage("5E");
+//   try {
+//     if (state.isConnected && state.port) {
+//       if (state.reader) {
+//         // 取消讀取操作並捕獲潛在錯誤
+//         try {
+//           await state.reader.cancel();
+//         } catch (error) {
+//           console.error("取消讀取操作時發生錯誤:", error);
+//         } finally {
+//           state.reader.releaseLock();
+//         }
+//       }
+//
+//       // 關閉串行端口
+//       try {
+//         await state.port.close();
+//         console.log("串行端口已關閉");
+//       } catch (error) {
+//         console.error("關閉串行端口時發生錯誤:", error);
+//       }
+//
+//       // 更新狀態
+//       state.isConnected = false;
+//       state.port = null;
+//       state.reader = null;
+//       state.state = "off";
+//       console.log("連接已關閉");
+//     }
+//   } catch (error) {
+//     console.error("關閉連接時發生錯誤:", error);
+//   }
+// };
+
 const connectSerial = async () => {
   try {
     // 請求串行端口
@@ -152,7 +190,7 @@ const connectSerial = async () => {
     await state.port.open(PORT_OPTIONS);
     console.log("串行端口連接成功");
     state.isConnected = true;
-    state.state = "on";
+    state.state = "啟動";
     startReading();
   } catch (error) {
     console.error("連接失敗:", error);
@@ -161,6 +199,7 @@ const connectSerial = async () => {
 };
 
 const onConfirmDeposit = () => {
+  console.log("confirm");
   sendMessage(SEND_ACTION_CODES.confirm);
   depositMachine.value.confirmDeposit();
 };
@@ -174,10 +213,28 @@ const onClearData = () => {
   state.receivedData = [];
 };
 
+const badgeState = computed(() => {
+  switch (true) {
+    case state.isConnected && state.state === "已入鈔，等待確認儲值":
+      return "warning";
+    case state.isConnected:
+      return "green";
+    case !state.isConnected:
+      return "red";
+    default:
+      return "warning";
+  }
+});
+
 const init = async () => {
   depositMachine.value = new CashDepositMachine(
     new BillValidator(),
-    new BillStorage(),
+    {
+      storeBill: (amount) => {
+        state.totalAmount += amount;
+      },
+      returnBill: () => {}
+    },
     new ConsoleDisplay()
   );
 };
@@ -189,20 +246,39 @@ init();
   <div class="deposit">
     <q-card>
       <div class="deposit-actions">
-        <q-btn color="primary" label="啟動入鈔機" @click="connectSerial" />
-        <q-btn color="primary" label="關閉入鈔機" />
-        <q-btn color="primary" label="確認入鈔" @click="onConfirmDeposit" />
-        <q-btn color="primary" label="退鈔" @click="onCancelDeposit" />
+        <q-btn
+          color="primary"
+          :disable="state.isConnected"
+          label="啟動入鈔機監聽"
+          @click="connectSerial"
+        />
+        <!--        <q-btn color="primary" label="關閉入鈔機" @click="closeConnection" />-->
+        <q-btn
+          color="primary"
+          :disable="!state.isConnected"
+          label="確認入鈔"
+          @click="onConfirmDeposit"
+        />
+        <q-btn
+          color="primary"
+          :disable="!state.isConnected"
+          label="退鈔"
+          @click="onCancelDeposit"
+        />
       </div>
       <div class="deposit-state">
         <h4>入鈔機狀態：</h4>
-        <q-badge :color="state.isConnected ? 'green' : 'red'">{{
-          state.state
-        }}</q-badge>
+        <q-badge
+          style="font-size: 1rem; padding: 0.5rem 1rem"
+          :color="badgeState"
+          >{{ state.state }}</q-badge
+        >
       </div>
       <div class="deposit-amount">
         <h4>當前等待確認的金額：</h4>
         <p>${{ state.currentPendingAmount }}</p>
+        <h4>存入總金額：</h4>
+        <p>${{ state.totalAmount }}</p>
       </div>
       <div class="deposit-codes">
         <h4>機器傳入十六進制代碼：</h4>

@@ -26,6 +26,7 @@ export class CashDepositMachine {
   private billStorage: IBillStorage;
   private display: IDisplay;
   private currentAmount: number = 0;
+  private totalAmount: number = 0;
   private state: "idle" | "pending" = "idle";
 
   constructor(
@@ -75,6 +76,7 @@ export class CashDepositMachine {
   confirmDeposit(): void {
     if (this.state === "pending") {
       this.billStorage.storeBill(this.currentAmount);
+      this.totalAmount += this.currentAmount;
       this.display.showMessage(`成功存入 ${this.currentAmount} 元`);
       this.currentAmount = 0;
       this.state = "idle";
@@ -94,6 +96,10 @@ export class CashDepositMachine {
   // 獲取當前金額方法
   getCurrentAmount(): number {
     return this.currentAmount;
+  }
+
+  getTotalAmount(): number {
+    return this.totalAmount;
   }
 }
 
