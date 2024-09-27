@@ -111,6 +111,7 @@ export const useTP70Deposit = () => {
         break;
       default:
         console.log("未知命令:", hexs);
+        break;
     }
   };
 
@@ -153,6 +154,7 @@ export const useTP70Deposit = () => {
         }
       } catch (error) {
         state.state = "OFF";
+        state.isConnected = false;
         console.error("讀取錯誤:", error);
       } finally {
         state.reader.releaseLock();

@@ -129,41 +129,4 @@ export class ConsoleDisplay implements IDisplay {
   }
 }
 
-// // 使用示例
-// async function main() {
-//   // 創建依賴項
-//   const billValidator = new SimpleBillValidator();
-//   const billStorage = new SimpleBillStorage();
-//   const display = new ConsoleDisplay();
-//
-//   // 創建現金存款機實例
-//   const cashDepositMachine = new CashDepositMachine(billValidator, billStorage, display);
-//
-//   // 使用自定義啟動邏輯
-//   await cashDepositMachine.startup({
-//     onStarting: async () => {
-//       console.log("執行自定義啟動檢查...");
-//       await new Promise(resolve => setTimeout(resolve, 2000)); // 模擬一些異步操作
-//       console.log("自定義檢查完成");
-//     },
-//     onStarted: () => {
-//       console.log("機器啟動完成，開始營業");
-//     }
-//   });
-//
-//   // 模擬一些操作
-//   cashDepositMachine.insertBill(500);
-//   cashDepositMachine.insertBill(200); // 這會被拒絕
-//   cashDepositMachine.insertBill(1000);
-//   console.log(`當前金額: ${cashDepositMachine.getCurrentAmount()}`);
-//   cashDepositMachine.confirmDeposit();
-//
-//   // 模擬另一次存款操作
-//   cashDepositMachine.insertBill(100);
-//   cashDepositMachine.cancelDeposit();
-// }
-//
-// // 運行主函數
-// main().catch(console.error);
-
 export default CashDepositMachine;
