@@ -1,168 +1,296 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from "vue";
+import {
+  CashDepositMachine,
+  BillValidator,
+  ConsoleDisplay
+} from "@/services/deposit";
+import {
+  convertToHexArray,
+  hexStringToUint8Array
+} from "@/utils/hexStringToUint8Array";
 
-const isConnected = ref(false);
-const receivedData = ref<string[]>([]);
-const inputCommand = ref("");
-let port: any = null;
-let reader: any = null;
+// 串行端口配置
+const PORT_OPTIONS = {
+  baudRate: 9600,
+  dataBits: 8,
+  stopBits: 1,
+  parity: "even",
+  flowControl: "none"
+};
 
-async function connectSerial() {
-  try {
-    // 請求串行端口
-    port = await (navigator as any).serial.requestPort();
+// 入鈔機支持的面額代碼
+const AMOUNT_CODES = {
+  "40": 100,
+  "41": 200,
+  "42": 500,
+  "43": 1000
+};
 
-    // 打開串行端口，設定為 8E1
-    await port.open({
-      baudRate: 9600,
-      dataBits: 8,
-      stopBits: 1,
-      parity: "even",
-      flowControl: "none"
-    });
+const SEND_ACTION_CODES = {
+  confirm: "02", // 確認入鈔 or 啟動
+  cancel: "0F", // 退鈔
+  pending: "18", // 讓入鈔機等待指令
+  close: "5E", // 關閉連接
+  reOpen: "3E" // 重新開啟連接
+};
 
-    console.log("串行端口連接成功");
-    isConnected.value = true;
-    startReading();
-  } catch (error) {
-    console.error("連接失敗:", error);
-    isConnected.value = false;
-  }
+interface State {
+  isConnected: boolean; // 是否已連接
+  receivedData: string[]; // 接收到的數據
+  state: string; // 狀態
+  port: any; // 串行端口
+  reader: any; // 串行讀取器
+  currentPendingAmount: number; // 當前等待確認的金額
+  totalAmount: number; // 存入總金額
 }
 
-async function startReading() {
-  while (port.readable) {
-    reader = port.readable.getReader();
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          break;
-        }
-        // 將接收到的 Uint8Array 轉換為十六進制字符串數組
-        const hexValues = Array.from(value).map((byte) => {
-          if (typeof byte === "number" && !isNaN(byte)) {
-            return byte.toString(16).padStart(2, "0").toUpperCase();
-          } else {
-            console.warn("Received invalid byte:", byte);
-            return "??"; // 或者其他表示無效數據的標記
-          }
-        });
-        receivedData.value = [...receivedData.value, ...hexValues];
+const state: State = reactive({
+  isConnected: false,
+  receivedData: [] as string[],
+  state: "off",
+  port: null as any,
+  reader: null as any,
+  currentPendingAmount: 0,
+  totalAmount: 0
+});
 
-        // 限制存儲的數據量
-        if (receivedData.value.length > 1000) {
-          receivedData.value = receivedData.value.slice(-1000);
+const depositMachine = ref();
+
+const onMessage = (hexs: string[]) => {
+  const action = hexs[0];
+  switch (action) {
+    // 80代表啟動入鈔機 等待啟用
+    case "80": {
+      depositMachine.value.startup({
+        onStarting: () => {
+          sendMessage("02");
+          state.state = "等待入鈔中";
         }
+      });
+      break;
+    }
+    // 81代表通過入鈔通過驗證
+    case "81": {
+      const amount = AMOUNT_CODES[hexs[1]];
+      const isValid = depositMachine.value.insertBill(amount);
+      // 如果面額有效，則發送 18 進入等待狀態
+      if (isValid) {
+        sendMessage(SEND_ACTION_CODES.pending);
+        state.currentPendingAmount = amount;
+        state.state = "已入鈔，等待確認儲值";
+      } else {
+        // 如果面額無效，則發送 0F 退鈔
+        sendMessage(SEND_ACTION_CODES.cancel);
       }
-    } catch (error) {
-      console.error("讀取錯誤:", error);
-    } finally {
-      reader.releaseLock();
+      break;
     }
+    // 29 紙鈔驗證失敗
+    case "29":
+      depositMachine.value.cancelDeposit();
+      state.currentPendingAmount = 0;
+      state.state = "等待入鈔中";
+      break;
+    // 10代表確認入鈔
+    case "10":
+      depositMachine.value.confirmDeposit();
+      state.currentPendingAmount = 0;
+      state.state = "等待入鈔中";
+      break;
+    default:
+      console.log("未知命令:", hexs);
   }
-}
+};
 
-// 輔助函數：將十六進制字符串轉換為 Uint8Array
-function hexStringToUint8Array(hexString: string): Uint8Array {
-  // 移除所有空格，並確保字符串長度為偶數
-  hexString = hexString.replace(/\s/g, "");
-  if (hexString.length % 2 !== 0) {
-    throw new Error("十六進制字符串長度必須為偶數");
-  }
-
-  const arrayBuffer = new Uint8Array(hexString.length / 2);
-
-  for (let i = 0; i < hexString.length; i += 2) {
-    const byteValue = parseInt(hexString.substr(i, 2), 16);
-    if (isNaN(byteValue)) {
-      throw new Error("無效的十六進制字符串");
-    }
-    arrayBuffer[i / 2] = byteValue;
-  }
-
-  return arrayBuffer;
-}
-
-async function sendMessage() {
-  if (!isConnected.value || !port) {
+const sendMessage = async (hex) => {
+  if (!state.isConnected || !state.port) {
     console.error("串行端口未連接");
     return;
   }
 
   try {
-    const writer = port.writable.getWriter();
-    const data = hexStringToUint8Array(inputCommand.value);
+    const writer = state.port.writable.getWriter();
+    const data = hexStringToUint8Array(hex);
     await writer.write(data);
     writer.releaseLock();
     console.log("訊息發送成功");
   } catch (error) {
     console.error("發送訊息失敗:", error);
   }
-}
+};
 
-async function closeConnection() {
-  if (isConnected.value && port) {
-    if (reader) {
-      await reader.cancel();
+const startReading = async () => {
+  while (state.port.readable) {
+    state.reader = state.port.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await state.reader.read();
+        if (done) {
+          break;
+        }
+        // 將接收到的 Uint8Array 轉換為十六進制字符串數組
+        const hexValues = convertToHexArray(value);
+        onMessage(hexValues);
+        console.log(hexValues, "hexValues");
+        state.receivedData = [...hexValues, ...state.receivedData];
+
+        // 限制存儲的數據量
+        if (state.receivedData.length > 1000) {
+          state.receivedData = state.receivedData.slice(-1000);
+        }
+      }
+    } catch (error) {
+      console.error("讀取錯誤:", error);
+    } finally {
+      state.reader.releaseLock();
     }
-    await port.close();
-    isConnected.value = false;
-    port = null;
-    reader = null;
-    console.log("連接已關閉");
   }
-}
+};
 
-onUnmounted(() => {
-  closeConnection();
+// const closeConnection = async () => {
+//   sendMessage("5E");
+//   try {
+//     if (state.isConnected && state.port) {
+//       if (state.reader) {
+//         // 取消讀取操作並捕獲潛在錯誤
+//         try {
+//           await state.reader.cancel();
+//         } catch (error) {
+//           console.error("取消讀取操作時發生錯誤:", error);
+//         } finally {
+//           state.reader.releaseLock();
+//         }
+//       }
+//
+//       // 關閉串行端口
+//       try {
+//         await state.port.close();
+//         console.log("串行端口已關閉");
+//       } catch (error) {
+//         console.error("關閉串行端口時發生錯誤:", error);
+//       }
+//
+//       // 更新狀態
+//       state.isConnected = false;
+//       state.port = null;
+//       state.reader = null;
+//       state.state = "off";
+//       console.log("連接已關閉");
+//     }
+//   } catch (error) {
+//     console.error("關閉連接時發生錯誤:", error);
+//   }
+// };
+
+const connectSerial = async () => {
+  try {
+    // 請求串行端口
+    state.port = await (navigator as any).serial.requestPort();
+
+    // 打開串行端口，設定為 8E1
+    await state.port.open(PORT_OPTIONS);
+    console.log("串行端口連接成功");
+    state.isConnected = true;
+    state.state = "啟動";
+    startReading();
+  } catch (error) {
+    console.error("連接失敗:", error);
+    state.isConnected = false;
+  }
+};
+
+const onConfirmDeposit = () => {
+  console.log("confirm");
+  sendMessage(SEND_ACTION_CODES.confirm);
+  depositMachine.value.confirmDeposit();
+};
+
+const onCancelDeposit = () => {
+  sendMessage(SEND_ACTION_CODES.cancel);
+  depositMachine.value.cancelDeposit();
+};
+
+const onClearData = () => {
+  state.receivedData = [];
+};
+
+const badgeState = computed(() => {
+  switch (true) {
+    case state.isConnected && state.state === "已入鈔，等待確認儲值":
+      return "warning";
+    case state.isConnected:
+      return "green";
+    case !state.isConnected:
+      return "red";
+    default:
+      return "warning";
+  }
 });
+
+const init = async () => {
+  depositMachine.value = new CashDepositMachine(
+    new BillValidator(),
+    {
+      storeBill: (amount) => {
+        state.totalAmount += amount;
+      },
+      returnBill: () => {}
+    },
+    new ConsoleDisplay()
+  );
+};
+
+init();
 </script>
 
 <template>
-  <div>
-    <q-btn @click="connectSerial" label="連接串行端口" :disable="isConnected" />
-    <q-btn
-      @click="sendMessage"
-      label="發送訊息"
-      :disable="!isConnected"
-      class="q-ml-sm"
-    />
-    <q-input label="輸入指令" v-model="inputCommand" />
-    <q-btn
-      @click="closeConnection"
-      label="關閉連接"
-      :disable="!isConnected"
-      class="q-ml-sm"
-    />
-
-    <div v-if="isConnected" class="q-mt-md">
-      <h3>接收到的數據：</h3>
-      <pre>{{ receivedData }}</pre>
-    </div>
+  <div class="deposit">
+    <q-card>
+      <div class="deposit-actions">
+        <q-btn
+          color="primary"
+          :disable="state.isConnected"
+          label="啟動入鈔機監聽"
+          @click="connectSerial"
+        />
+        <!--        <q-btn color="primary" label="關閉入鈔機" @click="closeConnection" />-->
+        <q-btn
+          color="primary"
+          :disable="!state.isConnected"
+          label="確認入鈔"
+          @click="onConfirmDeposit"
+        />
+        <q-btn
+          color="primary"
+          :disable="!state.isConnected"
+          label="退鈔"
+          @click="onCancelDeposit"
+        />
+      </div>
+      <div class="deposit-state">
+        <h4>入鈔機狀態：</h4>
+        <q-badge
+          style="font-size: 1rem; padding: 0.5rem 1rem"
+          :color="badgeState"
+          >{{ state.state }}</q-badge
+        >
+      </div>
+      <div class="deposit-amount">
+        <h4>當前等待確認的金額：</h4>
+        <p>${{ state.currentPendingAmount }}</p>
+        <h4>存入總金額：</h4>
+        <p>${{ state.totalAmount }}</p>
+      </div>
+      <div class="deposit-codes">
+        <h4>機器傳入十六進制代碼：</h4>
+        <p>
+          <q-icon
+            name="refresh"
+            size="20px"
+            style="margin-right: 1rem"
+            @click="onClearData"
+          />{{ state.receivedData }}
+        </p>
+      </div>
+    </q-card>
   </div>
 </template>
-
-<style lang="scss" scoped>
-.home-card {
-  margin: 20px;
-  width: 400px;
-  background: #eeeeee;
-}
-
-.box {
-  border-radius: 28px;
-  border: #ffffff 5px solid;
-  box-shadow: #e2a307 0.5px 0.5px 0.5px;
-}
-
-pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  background-color: #f4f4f4;
-  padding: 10px;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-</style>
