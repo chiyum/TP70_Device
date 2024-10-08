@@ -32,4 +32,10 @@ export const convertToHexArray = (data: Uint8Array): string[] => {
   });
 };
 
+export const textToHex = (text: string): string => {
+  return Array.from(text)
+    .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0"))
+    .join("");
+};
+
 export default hexStringToUint8Array;
