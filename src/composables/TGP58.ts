@@ -280,6 +280,29 @@ export const useTGP58Printer = () => {
     return hexText.padEnd(length * 2, "20"); // 用空格（20h）填充到指定長度
   };
 
+  const uploadText = (textLines) => {
+    // 命令前缀
+    const prefix = "33BD";
+
+    // 对齐方式（8个文本行的对齐方式）
+    const alignments = textLines
+      .map((line) => line.align || "00")
+      .concat(Array(8 - textLines.length).fill("00"))
+      .join("");
+
+    // 文本内容
+    const textContent = textLines
+      .map((line) => textToFixedHex(line.text, 48))
+      .concat(Array(8 - textLines.length).fill("20".repeat(48)))
+      .join("");
+
+    // 构建完整的命令
+    const command = prefix + alignments + textContent;
+
+    // 发送命令到打印机
+    return sendMessage("uploadText", command);
+  };
+
   // 創建單個項目的命令
   const createItemCommand = (type: string, setting: string): string => {
     return `${type}${setting}`;
@@ -439,6 +462,7 @@ export const useTGP58Printer = () => {
     cutPaper,
     clearLog,
     printReport,
+    uploadText,
     printReceipt,
     setDateTime,
     clearReceivedData,
