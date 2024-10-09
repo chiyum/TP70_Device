@@ -6,33 +6,70 @@ import {
 
 // TGP58 串行端口配置
 const PORT_OPTIONS = {
-  baudRate: 38400, // TGP58 使用 38400 波特率
-  dataBits: 8,
-  stopBits: 1,
-  parity: "none", // TGP58 不使用奇偶校驗
-  flowControl: "none"
+  baudRate: 38400, // 波特率
+  dataBits: 8, // 數據位
+  stopBits: 1, // 停止位
+  parity: "none", // 奇偶校驗
+  flowControl: "none" // 流控制
+};
+
+const TEXT_ALIGN = {
+  LEFT: 0,
+  CENTER: 1,
+  RIGHT: 2
+};
+
+const FONT_SIZE = {
+  NORMAL: 1, // 1x1
+  TALL: 2, // 1x2
+  LARGE: 3, // 2x2
+  EXTRA_TALL: 4, // 2x4
+  EXTRA_LARGE: 5, // 3x3
+  HUGE: 6 // 3x6
 };
 
 // TGP58 命令集
 const TGP58_COMMANDS = {
+  // 基本命令
   readDateTime: "1BF0", // 讀取日期時間
   setDateTime: "1BF1", // 設置日期時間
-  printReport: "1BF9", // 打印報表
+  clearLog: "1BF2", // 清除日誌
   cutPaper: "1BF5", // 切紙
-  printText: "1DF7", // 打印文字
-  formatPrint: "33BB" // 排版列印功能的命令
-  // 可以根據需要添加更多命令
+  printReport: "1BF9", // 打印報表
+  printLog: "1BF9", // 打印日誌（與打印報表相同）
+  getFirmwareVersion: "1BFB", // 獲取韌體版本
+  getStatus: "1BFC", // 獲取打印機狀態
+
+  // 格式化列印功能
+  formatPrint: "33BB", // 排版打印
+
+  // 文字內容上傳
+  uploadText: "33BD", // 上傳文本內容
+
+  // NO/NC 選擇
+  setNONC: "33BC", // 設置 NO/NC
+
+  // 圖形相關
+  uploadLogo: "1DF4", // 上傳商標
+  printGraphics: "1DF8", // 打印圖形
+  printText: "1DF7", // 打印文本
+
+  // 其他控制命令
+  newLine: "0A", // 換行
+  advancePaper: "1B64" // 出紙
 };
 
 export const useTGP58Printer = () => {
+  // 定義打印機狀態接口
   interface State {
-    isConnected: boolean;
-    receivedData: string[];
-    state: string;
-    port: any;
-    reader: any;
+    isConnected: boolean; // 是否已連接
+    receivedData: string[]; // 接收到的數據
+    state: string; // 當前狀態
+    port: any; // 串口對象
+    reader: any; // 讀取器對象
   }
 
+  // 初始化打印機狀態
   const state: State = reactive({
     isConnected: false,
     receivedData: [] as string[],
@@ -41,6 +78,7 @@ export const useTGP58Printer = () => {
     reader: null as any
   });
 
+  // 計算連接狀態的徽章顏色
   const badgeState = computed(() => {
     return state.isConnected ? "green" : "red";
   });
@@ -49,13 +87,27 @@ export const useTGP58Printer = () => {
   const onMessage = (hexs: string[]): void => {
     const responseCode = hexs.join("");
     switch (responseCode) {
-      case "7733": // 設置日期時間成功
-        console.log("日期時間設置成功");
-        break;
-      case "06": // 一般成功響應
+      case "06":
         console.log("命令執行成功");
         break;
-      // 可以根據 TGP58 的其他響應添加更多 case
+      case "0A":
+        console.log("命令執行失敗");
+        break;
+      case "42":
+        console.log("48字節資料接收正確");
+        break;
+      case "AB":
+        console.log("全部資料接收完成");
+        break;
+      case "00":
+        console.log("打印機狀態: 正常");
+        break;
+      case "01":
+        console.log("打印機狀態: 缺紙");
+        break;
+      case "02":
+        console.log("打印機狀態: 裁刀故障");
+        break;
       default:
         console.log("未知響應:", responseCode);
     }
@@ -70,14 +122,14 @@ export const useTGP58Printer = () => {
       console.error("串行端口未連接");
       return;
     }
-    const hexCommand = TGP58_COMMANDS[command] + data;
-    console.log("Sending hex command:", hexCommand); // 添加這行來檢查
+    const hexCommand = data ? data : TGP58_COMMANDS[command];
+    console.log("發送十六進制命令:", hexCommand);
     try {
       const writer = state.port.writable.getWriter();
-      const commandData = hexStringToUint8Array(TGP58_COMMANDS[command] + data);
+      const commandData = hexStringToUint8Array(hexCommand);
+      console.log("命令數據:", commandData);
       await writer.write(commandData);
       writer.releaseLock();
-      console.log("命令發送成功:", command);
     } catch (error) {
       console.error("發送命令失敗:", error);
     }
@@ -95,9 +147,10 @@ export const useTGP58Printer = () => {
           }
           const hexValues = convertToHexArray(value);
           onMessage(hexValues);
-          console.log(hexValues, "hexValues");
+          console.log(hexValues, "接收到的十六進制值");
           state.receivedData = [...hexValues, ...state.receivedData];
 
+          // 限制存儲的數據量
           if (state.receivedData.length > 1000) {
             state.receivedData = state.receivedData.slice(-1000);
           }
@@ -121,7 +174,6 @@ export const useTGP58Printer = () => {
       state.isConnected = true;
       state.state = "啟動";
       startReading();
-      // 連接成功後初始化 TGP58
       initTGP58();
     } catch (error) {
       console.error("連接失敗:", error);
@@ -129,56 +181,158 @@ export const useTGP58Printer = () => {
     }
   };
 
-  // TGP58 特定功能
-  const printText = (text: string) => {
-    const hexText = textToHex(text);
-    const fullCommand = TGP58_COMMANDS.printText + "00" + hexText + "0D";
-    sendMessage("printText", fullCommand);
-  };
-
+  // 切紙
   const cutPaper = () => {
-    sendMessage("cutPaper");
+    return sendMessage("cutPaper", TGP58_COMMANDS.cutPaper);
   };
 
+  // 打印報表
   const printReport = () => {
-    sendMessage("printReport");
+    return sendMessage("printReport", TGP58_COMMANDS.printReport);
   };
 
+  // 設置日期時間
   const setDateTime = (dateTime: Date) => {
     const formattedDateTime = dateTime
       .toISOString()
       .replace(/[-:T]/g, "")
       .slice(2, 14);
 
-    // 將日期時間轉換為十六進制字串
     const hexDateTime = Array.from(formattedDateTime)
       .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0"))
       .join("");
 
-    console.log("Formatted hex date time:", hexDateTime);
-    sendMessage("setDateTime", hexDateTime + "00");
+    return sendMessage(
+      "setDateTime",
+      TGP58_COMMANDS.setDateTime + hexDateTime + "00"
+    );
   };
 
-  const initTGP58 = () => {
-    if (state.isConnected) {
-      // 設置當前日期時間
-      const currentDateTime = new Date();
-      setDateTime(currentDateTime);
-    }
+  const printText = async (text): Promise<void> => {
+    console.log(text, "printText");
+    const hexText = textToHex(text); // 將文本轉換為十六進制格式
+    const printCommand = TGP58_COMMANDS.printText + "03" + hexText + "0D"; // 組合成打印命令
+
+    await sendMessage("printText", printCommand); // 發送命令到打印機
+  };
+  /**
+   * 生成TGP58打印機格式化文本的命令
+   * @desc 根據給定的文本、對齊方式和字體大小生成TGP58打印機可識別的格式化文本命令
+   * @param {string} text 要打印的文本
+   * @param {number} align 文本對齊方式 (0: 左對齊, 1: 居中對齊, 2: 右對齊)
+   * @param {number} fontSize 字體大小 (1: 1x1, 2: 1x2, 3: 2x2, 4: 2x4, 5: 3x3, 6: 3x6)
+   * @returns {string} 返回十六進制格式的打印命令字符串
+   * @example
+   * // 返回 "741048656C6C6F20576F726C64" (居中對齊, 1x1字體大小的 "Hello World")
+   * formatTextCommand("Hello World", 1, 1)
+   */
+  const formatTextCommand = (
+    text: string,
+    align: number,
+    fontSize: number
+  ): string => {
+    const hexText = textToHex(text);
+    const fontSizeCode = (fontSize - 1).toString(16).padStart(2, "0");
+    const formatByte = ((align << 4) | parseInt(fontSizeCode, 16))
+      .toString(16)
+      .padStart(2, "0");
+    return `74${formatByte}${hexText}`;
   };
 
+  // 打印具有複雜布局的收據
+  const printReceipt = async () => {
+    const command = `33BB${[
+      formatTextCommand("RECEIPT", TEXT_ALIGN.CENTER, FONT_SIZE.LARGE), // 居中，2x2 字體
+      "2001", // 空一行
+      formatTextCommand("Item 1", TEXT_ALIGN.LEFT, FONT_SIZE.NORMAL), // 左對齊，普通大小
+      formatTextCommand("$10.00", TEXT_ALIGN.RIGHT, FONT_SIZE.NORMAL), // 右對齊，普通大小
+      formatTextCommand("Item 2", TEXT_ALIGN.LEFT, FONT_SIZE.NORMAL),
+      formatTextCommand("$15.00", TEXT_ALIGN.RIGHT, FONT_SIZE.NORMAL),
+      "2001", // 空一行
+      formatTextCommand("Total: $25.00", TEXT_ALIGN.RIGHT, FONT_SIZE.TALL) // 右對齊，1x2 字體
+    ].join("")}`;
+
+    await sendMessage("formatPrint", command);
+  };
+
+  // 打印文本並在前後插入兩個空白行
+  const printWithPadding = async (text: string) => {
+    // 將文字轉換為十六進制
+    const hexText = textToHex(text);
+
+    // 構建命令：
+    // - 33BB 開頭（排版命令）
+    // - 空兩行：20 表示空白行，02 表示兩行
+    // - 文字：74 表示文字，00 表示置左
+    // - 再空兩行：20 表示空白行，02 表示兩行
+    const command = `${TGP58_COMMANDS.formatPrint}20027400${hexText}2002`;
+
+    // 發送命令到打印機
+    await sendMessage("formatPrint", command);
+  };
+
+  // 清除接收數據
   const clearReceivedData = () => {
     state.receivedData = [];
   };
 
+  // 獲取韌體版本
+  const getFirmwareVersion = () => {
+    return sendMessage("getFirmwareVersion", TGP58_COMMANDS.getFirmwareVersion);
+  };
+
+  // 獲取打印機狀態
+  const getPrinterStatus = () => {
+    return sendMessage("getStatus", TGP58_COMMANDS.getStatus);
+  };
+
+  // 初始化 TGP58
+  const initTGP58 = async () => {
+    if (state.isConnected) {
+      const noncCommand = "33BC00"; // 設置為常開模式
+      await sendMessage("setNONC", noncCommand);
+      setDateTime(new Date());
+    }
+  };
+
+  // 以下是不會回傳資料的函數 機器不會有反應
+
+  // 出紙
+  const advancePaper = async (lines: number = 3) => {
+    const command =
+      TGP58_COMMANDS.advancePaper + lines.toString(16).padStart(2, "0");
+    await sendMessage("advancePaper", command);
+  };
+
+  // 發送圖形數據到列印機
+  const printSimpleGraphic = async () => {
+    // 圖形數據 (8x8 的點陣圖，每個字節表示一行像素)
+    const graphicData = "FF818181818181FF"; // 8x8 方塊的十六進制表示
+
+    // 構建圖形列印命令：1DF8 開頭 + 圖形數據
+    const command = `${TGP58_COMMANDS.printGraphics}${graphicData}`;
+
+    console.log("發送的圖形命令:", command);
+
+    // 發送圖形列印命令
+    await sendMessage("printGraphics", command);
+  };
+
+  // 返回可用的函數和狀態
   return {
     state,
     badgeState,
+    advancePaper,
     connectSerial,
+    printSimpleGraphic,
     printText,
+    printWithPadding,
     cutPaper,
     printReport,
+    printReceipt,
     setDateTime,
-    clearReceivedData
+    clearReceivedData,
+    getFirmwareVersion,
+    getPrinterStatus
   };
 };
