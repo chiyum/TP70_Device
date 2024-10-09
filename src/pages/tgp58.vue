@@ -14,7 +14,8 @@ const {
   printWithPadding,
   getPrinterStatus,
   advancePaper,
-  printSimpleGraphic
+  printSimpleGraphic,
+  clearLog
 } = useTGP58Printer();
 
 const handleGetFirmwareVersion = async () => {
@@ -56,6 +57,7 @@ const handelPrintReceipt = async () => {
     <q-btn @click="handleInputPrint">打印輸入的文本</q-btn>
     <q-btn @click="printSimpleGraphic">打印圖檔</q-btn>
     <q-btn @click="handelPrintReceipt">打印收據</q-btn>
+    <q-btn @click="clearLog">清除日誌</q-btn>
     <q-btn @click="handleInputPaddingPrint">
       打印輸入的文本並在前後加空格
     </q-btn>

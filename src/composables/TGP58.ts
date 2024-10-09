@@ -13,20 +13,20 @@ const PORT_OPTIONS = {
   flowControl: "none" // 流控制
 };
 
-const TEXT_ALIGN = {
-  LEFT: 0,
-  CENTER: 1,
-  RIGHT: 2
-};
-
-const FONT_SIZE = {
-  NORMAL: 1, // 1x1
-  TALL: 2, // 1x2
-  LARGE: 3, // 2x2
-  EXTRA_TALL: 4, // 2x4
-  EXTRA_LARGE: 5, // 3x3
-  HUGE: 6 // 3x6
-};
+// const TEXT_ALIGN = {
+//   LEFT: 0,
+//   CENTER: 1,
+//   RIGHT: 2
+// };
+//
+// const FONT_SIZE = {
+//   NORMAL: 1, // 1x1
+//   TALL: 2, // 1x2
+//   LARGE: 3, // 2x2
+//   EXTRA_TALL: 4, // 2x4
+//   EXTRA_LARGE: 5, // 3x3
+//   HUGE: 6 // 3x6
+// };
 
 // TGP58 命令集
 const TGP58_COMMANDS = {
@@ -226,33 +226,138 @@ export const useTGP58Printer = () => {
    * // 返回 "741048656C6C6F20576F726C64" (居中對齊, 1x1字體大小的 "Hello World")
    * formatTextCommand("Hello World", 1, 1)
    */
-  const formatTextCommand = (
-    text: string,
-    align: number,
-    fontSize: number
-  ): string => {
-    const hexText = textToHex(text);
-    const fontSizeCode = (fontSize - 1).toString(16).padStart(2, "0");
-    const formatByte = ((align << 4) | parseInt(fontSizeCode, 16))
-      .toString(16)
-      .padStart(2, "0");
-    return `74${formatByte}${hexText}`;
+  // const formatTextCommand = (
+  //   text: string,
+  //   align: number,
+  //   fontSize: number
+  // ): string => {
+  //   const hexText = textToHex(text);
+  //   const fontSizeCode = (fontSize - 1).toString(16).padStart(2, "0");
+  //   const formatByte = ((align << 4) | parseInt(fontSizeCode, 16))
+  //     .toString(16)
+  //     .padStart(2, "0");
+  //   return `74${formatByte}${hexText}`;
+  // };
+
+  // 項目類型常量
+  const ITEM_TYPE = {
+    BLANK_LINE: "20",
+    LOGO: "4C",
+    QR_CODE: "51",
+    SCORE: "50",
+    DATE: "44",
+    BARCODE: "42",
+    TEXT_1: "74",
+    TEXT_2: "75",
+    TEXT_3: "76",
+    TEXT_4: "77",
+    TEXT_5: "78",
+    TEXT_6: "79",
+    TEXT_7: "7A",
+    TEXT_8: "7B"
   };
 
-  // 打印具有複雜布局的收據
-  const printReceipt = async () => {
-    const command = `33BB${[
-      formatTextCommand("RECEIPT", TEXT_ALIGN.CENTER, FONT_SIZE.LARGE), // 居中，2x2 字體
-      "2001", // 空一行
-      formatTextCommand("Item 1", TEXT_ALIGN.LEFT, FONT_SIZE.NORMAL), // 左對齊，普通大小
-      formatTextCommand("$10.00", TEXT_ALIGN.RIGHT, FONT_SIZE.NORMAL), // 右對齊，普通大小
-      formatTextCommand("Item 2", TEXT_ALIGN.LEFT, FONT_SIZE.NORMAL),
-      formatTextCommand("$15.00", TEXT_ALIGN.RIGHT, FONT_SIZE.NORMAL),
-      "2001", // 空一行
-      formatTextCommand("Total: $25.00", TEXT_ALIGN.RIGHT, FONT_SIZE.TALL) // 右對齊，1x2 字體
-    ].join("")}`;
+  // 對齊方式常量
+  const TEXT_ALIGN = {
+    LEFT: "00",
+    CENTER: "01",
+    RIGHT: "02"
+  };
 
-    await sendMessage("formatPrint", command);
+  // 字體大小常量
+  const FONT_SIZE = {
+    SIZE_1: "B1",
+    SIZE_2: "B2",
+    SIZE_3: "B3",
+    SIZE_4: "B4",
+    SIZE_5: "B5",
+    SIZE_6: "B6"
+  };
+
+  // 將文字轉換為固定長度的十六進制字串
+  const textToFixedHex = (text: string, length: number = 48): string => {
+    const hexText = textToHex(text);
+    return hexText.padEnd(length * 2, "20"); // 用空格（20h）填充到指定長度
+  };
+
+  // 創建單個項目的命令
+  const createItemCommand = (type: string, setting: string): string => {
+    return `${type}${setting}`;
+  };
+
+  // 創建文字項目的命令
+  const createTextItemCommand = (
+    type: string,
+    fontSize: string,
+    text: string
+  ): string => {
+    return `${type}${fontSize}${textToFixedHex(text)}`;
+  };
+
+  // 創建空白行項目的命令
+  const createBlankLineCommand = (lines: number): string => {
+    const height = Math.min(Math.max(lines, 1), 10)
+      .toString(16)
+      .padStart(2, "0");
+    return createItemCommand(ITEM_TYPE.BLANK_LINE, height);
+  };
+
+  // 創建完整的排版命令
+  const createFormatCommand = (items: string[]): string => {
+    const paddedItems = items.concat(Array(15 - items.length).fill("20B0")); // 填充到15個項目
+    return `33BB${paddedItems.join("")}`;
+  };
+
+  // 創建文字內容上傳命令
+  const createTextUploadCommand = (
+    texts: { text: string; align: string }[]
+  ): string => {
+    const alignments = texts
+      .map((t) => t.align)
+      .concat(Array(8 - texts.length).fill("00"))
+      .join("");
+    const textContents = texts.map((t) => textToFixedHex(t.text)).join("");
+    return `33BD${alignments}${textContents}`;
+  };
+
+  // 示例：創建一個簡單的收據排版
+  const createReceiptFormat = () => {
+    const items = [
+      createTextItemCommand(ITEM_TYPE.TEXT_1, FONT_SIZE.SIZE_3, "RECEIPT"),
+      createBlankLineCommand(1),
+      createTextItemCommand(ITEM_TYPE.TEXT_2, FONT_SIZE.SIZE_1, "Item 1"),
+      createTextItemCommand(ITEM_TYPE.TEXT_3, FONT_SIZE.SIZE_1, "$10.00"),
+      createTextItemCommand(ITEM_TYPE.TEXT_4, FONT_SIZE.SIZE_1, "Item 2"),
+      createTextItemCommand(ITEM_TYPE.TEXT_5, FONT_SIZE.SIZE_1, "$15.00"),
+      createBlankLineCommand(1),
+      createTextItemCommand(ITEM_TYPE.TEXT_6, FONT_SIZE.SIZE_2, "Total: $25.00")
+    ];
+
+    return createFormatCommand(items);
+  };
+
+  // 示例：上傳文字內容
+  const uploadReceiptText = () => {
+    const texts = [
+      { text: "RECEIPT", align: TEXT_ALIGN.CENTER },
+      { text: "Item 1", align: TEXT_ALIGN.LEFT },
+      { text: "$10.00", align: TEXT_ALIGN.RIGHT },
+      { text: "Item 2", align: TEXT_ALIGN.LEFT },
+      { text: "$15.00", align: TEXT_ALIGN.RIGHT },
+      { text: "Total: $25.00", align: TEXT_ALIGN.RIGHT }
+    ];
+
+    return createTextUploadCommand(texts);
+  };
+
+  // 打印收據
+  const printReceipt = async () => {
+    const formatCommand = createReceiptFormat();
+    const textUploadCommand = uploadReceiptText();
+
+    await sendMessage("formatPrint", formatCommand);
+    await sendMessage("uploadText", textUploadCommand);
+    // 這裡可能需要添加一個打印命令，具體取決於打印機的要求
   };
 
   // 打印文本並在前後插入兩個空白行
@@ -274,6 +379,10 @@ export const useTGP58Printer = () => {
   // 清除接收數據
   const clearReceivedData = () => {
     state.receivedData = [];
+  };
+
+  const clearLog = () => {
+    return sendMessage("clearLog", TGP58_COMMANDS.clearLog);
   };
 
   // 獲取韌體版本
@@ -328,6 +437,7 @@ export const useTGP58Printer = () => {
     printText,
     printWithPadding,
     cutPaper,
+    clearLog,
     printReport,
     printReceipt,
     setDateTime,
