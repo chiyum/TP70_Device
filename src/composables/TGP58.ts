@@ -116,19 +116,21 @@ export const useTGP58Printer = () => {
   // 發送命令到 TGP58
   const sendMessage = async (
     command: string,
-    data: string = ""
+    data: string = "",
+    bytes: any = null
   ): Promise<void> => {
     if (!state.isConnected || !state.port) {
       console.error("串行端口未連接");
       return;
     }
+    console.log("data:", data);
     const hexCommand = data ? data : TGP58_COMMANDS[command];
     console.log("發送十六進制命令:", hexCommand);
     try {
       const writer = state.port.writable.getWriter();
       const commandData = hexStringToUint8Array(hexCommand);
       console.log("命令數據:", commandData);
-      await writer.write(commandData);
+      await writer.write(bytes || commandData);
       writer.releaseLock();
     } catch (error) {
       console.error("發送命令失敗:", error);
@@ -211,7 +213,7 @@ export const useTGP58Printer = () => {
   const printText = async (text): Promise<void> => {
     console.log(text, "printText");
     const hexText = textToHex(text); // 將文本轉換為十六進制格式
-    const printCommand = TGP58_COMMANDS.printText + "03" + hexText + "0D"; // 組合成打印命令
+    const printCommand = TGP58_COMMANDS.printText + "B3" + hexText + "0D"; // 組合成打印命令
 
     await sendMessage("printText", printCommand); // 發送命令到打印機
   };
@@ -278,6 +280,30 @@ export const useTGP58Printer = () => {
   const textToFixedHex = (text: string, length: number = 48): string => {
     const hexText = textToHex(text);
     return hexText.padEnd(length * 2, "20"); // 用空格（20h）填充到指定長度
+  };
+
+  const wu88FormatCommend = async (amount: number): Promise<void> => {
+    console.log(amount, "amount");
+    const amountsHex = {
+      100: "31 30 30",
+      200: "32 30 30",
+      500: "35 30 30",
+      1000: "31 30 30 30"
+    };
+    const hexText = amountsHex[amount];
+    console.log(hexText, "hexText");
+    // 組合完整的命令
+    const printCommand = TGP58_COMMANDS.printText + "B3" + hexText + "0D"; // 組合成打印命令
+    await sendMessage("printText", printCommand); // 發送命令到打印機
+    console.log(emptyLineCommend);
+    // await cutPaper();
+  };
+  const emptyLineCommend = async (): Promise<void> => {
+    const hexText = "20";
+    // 組合完整的命令
+    const printCommand = TGP58_COMMANDS.printText + "B3" + hexText + "0D"; // 組合成打印命令
+
+    await sendMessage("printText", printCommand); // 發送命令到打印機
   };
 
   const uploadText = (textLines) => {
@@ -467,6 +493,7 @@ export const useTGP58Printer = () => {
     setDateTime,
     clearReceivedData,
     getFirmwareVersion,
-    getPrinterStatus
+    getPrinterStatus,
+    wu88FormatCommend
   };
 };

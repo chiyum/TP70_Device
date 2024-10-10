@@ -39,3 +39,10 @@ export const textToHex = (text: string): string => {
 };
 
 export default hexStringToUint8Array;
+
+export const hexToByte = (hexString) => {
+  const byteArray = new Uint8Array(
+    hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
+  );
+  return byteArray;
+};

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { useTGP58Printer } from "@/composables/TGP58";
 
 const input = ref("請輸入文字檔");
@@ -16,7 +16,8 @@ const {
   advancePaper,
   printSimpleGraphic,
   clearLog,
-  uploadText
+  uploadText,
+  wu88FormatCommend
 } = useTGP58Printer();
 
 const handleGetFirmwareVersion = async () => {
@@ -51,6 +52,11 @@ const onUploadText = async () => {
   ]);
   console.log("上傳文本完成");
 };
+
+const onUploadAmount = async (price: number) => {
+  console.log(price, "price");
+  await wu88FormatCommend(price);
+};
 </script>
 
 <template>
@@ -66,6 +72,9 @@ const onUploadText = async () => {
     <q-btn @click="printSimpleGraphic">打印圖檔</q-btn>
     <q-btn @click="handelPrintReceipt">打印收據</q-btn>
     <q-btn @click="onUploadText">打印收據2</q-btn>
+    <q-btn @click="onUploadAmount(100)">打印100</q-btn>
+    <q-btn @click="onUploadAmount(500)">打印500</q-btn>
+    <q-btn @click="onUploadAmount(1000)">打印1000</q-btn>
     <q-btn @click="clearLog">清除日誌</q-btn>
     <q-btn @click="handleInputPaddingPrint">
       打印輸入的文本並在前後加空格
