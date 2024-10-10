@@ -5,7 +5,6 @@ const input = ref("請輸入文字檔");
 
 const {
   connectSerial,
-  printReceipt,
   printText,
   cutPaper,
   printReport,
@@ -13,10 +12,7 @@ const {
   getFirmwareVersion,
   printWithPadding,
   getPrinterStatus,
-  advancePaper,
-  printSimpleGraphic,
   clearLog,
-  uploadText,
   wu88FormatCommend
 } = useTGP58Printer();
 
@@ -41,18 +37,6 @@ const handleInputPaddingPrint = async () => {
   console.log("打印完成");
 };
 
-const handelPrintReceipt = async () => {
-  await printReceipt();
-  console.log("打印收據完成");
-};
-
-const onUploadText = async () => {
-  uploadText([
-    { text: "RECEIPT1000", align: "01" } // 居中对齐
-  ]);
-  console.log("上傳文本完成");
-};
-
 const onUploadAmount = async (price: number) => {
   console.log(price, "price");
   await wu88FormatCommend(price);
@@ -67,11 +51,7 @@ const onUploadAmount = async (price: number) => {
     <q-btn @click="clearReceivedData">清除接收數據</q-btn>
     <q-btn @click="handleGetFirmwareVersion">獲取韌體版本</q-btn>
     <q-btn @click="handleGetPrinterStatus">獲取打印機狀態</q-btn>
-    <q-btn @click="advancePaper(10)">出紙10行</q-btn>
     <q-btn @click="handleInputPrint">打印輸入的文本</q-btn>
-    <q-btn @click="printSimpleGraphic">打印圖檔</q-btn>
-    <q-btn @click="handelPrintReceipt">打印收據</q-btn>
-    <q-btn @click="onUploadText">打印收據2</q-btn>
     <q-btn @click="onUploadAmount(100)">打印100</q-btn>
     <q-btn @click="onUploadAmount(500)">打印500</q-btn>
     <q-btn @click="onUploadAmount(1000)">打印1000</q-btn>

@@ -241,47 +241,6 @@ export const useTGP58Printer = () => {
   //   return `74${formatByte}${hexText}`;
   // };
 
-  // 項目類型常量
-  const ITEM_TYPE = {
-    BLANK_LINE: "20",
-    LOGO: "4C",
-    QR_CODE: "51",
-    SCORE: "50",
-    DATE: "44",
-    BARCODE: "42",
-    TEXT_1: "74",
-    TEXT_2: "75",
-    TEXT_3: "76",
-    TEXT_4: "77",
-    TEXT_5: "78",
-    TEXT_6: "79",
-    TEXT_7: "7A",
-    TEXT_8: "7B"
-  };
-
-  // 對齊方式常量
-  const TEXT_ALIGN = {
-    LEFT: "00",
-    CENTER: "01",
-    RIGHT: "02"
-  };
-
-  // 字體大小常量
-  const FONT_SIZE = {
-    SIZE_1: "B1",
-    SIZE_2: "B2",
-    SIZE_3: "B3",
-    SIZE_4: "B4",
-    SIZE_5: "B5",
-    SIZE_6: "B6"
-  };
-
-  // 將文字轉換為固定長度的十六進制字串
-  const textToFixedHex = (text: string, length: number = 48): string => {
-    const hexText = textToHex(text);
-    return hexText.padEnd(length * 2, "20"); // 用空格（20h）填充到指定長度
-  };
-
   const wu88FormatCommend = async (amount: number): Promise<void> => {
     console.log(amount, "amount");
     const amountsHex = {
@@ -295,118 +254,7 @@ export const useTGP58Printer = () => {
     // 組合完整的命令
     const printCommand = TGP58_COMMANDS.printText + "B3" + hexText + "0D"; // 組合成打印命令
     await sendMessage("printText", printCommand); // 發送命令到打印機
-    console.log(emptyLineCommend);
     // await cutPaper();
-  };
-  const emptyLineCommend = async (): Promise<void> => {
-    const hexText = "20";
-    // 組合完整的命令
-    const printCommand = TGP58_COMMANDS.printText + "B3" + hexText + "0D"; // 組合成打印命令
-
-    await sendMessage("printText", printCommand); // 發送命令到打印機
-  };
-
-  const uploadText = (textLines) => {
-    // 命令前缀
-    const prefix = "33BD";
-
-    // 对齐方式（8个文本行的对齐方式）
-    const alignments = textLines
-      .map((line) => line.align || "00")
-      .concat(Array(8 - textLines.length).fill("00"))
-      .join("");
-
-    // 文本内容
-    const textContent = textLines
-      .map((line) => textToFixedHex(line.text, 48))
-      .concat(Array(8 - textLines.length).fill("20".repeat(48)))
-      .join("");
-
-    // 构建完整的命令
-    const command = prefix + alignments + textContent;
-
-    // 发送命令到打印机
-    return sendMessage("uploadText", command);
-  };
-
-  // 創建單個項目的命令
-  const createItemCommand = (type: string, setting: string): string => {
-    return `${type}${setting}`;
-  };
-
-  // 創建文字項目的命令
-  const createTextItemCommand = (
-    type: string,
-    fontSize: string,
-    text: string
-  ): string => {
-    return `${type}${fontSize}${textToFixedHex(text)}`;
-  };
-
-  // 創建空白行項目的命令
-  const createBlankLineCommand = (lines: number): string => {
-    const height = Math.min(Math.max(lines, 1), 10)
-      .toString(16)
-      .padStart(2, "0");
-    return createItemCommand(ITEM_TYPE.BLANK_LINE, height);
-  };
-
-  // 創建完整的排版命令
-  const createFormatCommand = (items: string[]): string => {
-    const paddedItems = items.concat(Array(15 - items.length).fill("20B0")); // 填充到15個項目
-    return `33BB${paddedItems.join("")}`;
-  };
-
-  // 創建文字內容上傳命令
-  const createTextUploadCommand = (
-    texts: { text: string; align: string }[]
-  ): string => {
-    const alignments = texts
-      .map((t) => t.align)
-      .concat(Array(8 - texts.length).fill("00"))
-      .join("");
-    const textContents = texts.map((t) => textToFixedHex(t.text)).join("");
-    return `33BD${alignments}${textContents}`;
-  };
-
-  // 示例：創建一個簡單的收據排版
-  const createReceiptFormat = () => {
-    const items = [
-      createTextItemCommand(ITEM_TYPE.TEXT_1, FONT_SIZE.SIZE_3, "RECEIPT"),
-      createBlankLineCommand(1),
-      createTextItemCommand(ITEM_TYPE.TEXT_2, FONT_SIZE.SIZE_1, "Item 1"),
-      createTextItemCommand(ITEM_TYPE.TEXT_3, FONT_SIZE.SIZE_1, "$10.00"),
-      createTextItemCommand(ITEM_TYPE.TEXT_4, FONT_SIZE.SIZE_1, "Item 2"),
-      createTextItemCommand(ITEM_TYPE.TEXT_5, FONT_SIZE.SIZE_1, "$15.00"),
-      createBlankLineCommand(1),
-      createTextItemCommand(ITEM_TYPE.TEXT_6, FONT_SIZE.SIZE_2, "Total: $25.00")
-    ];
-
-    return createFormatCommand(items);
-  };
-
-  // 示例：上傳文字內容
-  const uploadReceiptText = () => {
-    const texts = [
-      { text: "RECEIPT", align: TEXT_ALIGN.CENTER },
-      { text: "Item 1", align: TEXT_ALIGN.LEFT },
-      { text: "$10.00", align: TEXT_ALIGN.RIGHT },
-      { text: "Item 2", align: TEXT_ALIGN.LEFT },
-      { text: "$15.00", align: TEXT_ALIGN.RIGHT },
-      { text: "Total: $25.00", align: TEXT_ALIGN.RIGHT }
-    ];
-
-    return createTextUploadCommand(texts);
-  };
-
-  // 打印收據
-  const printReceipt = async () => {
-    const formatCommand = createReceiptFormat();
-    const textUploadCommand = uploadReceiptText();
-
-    await sendMessage("formatPrint", formatCommand);
-    await sendMessage("uploadText", textUploadCommand);
-    // 這裡可能需要添加一個打印命令，具體取決於打印機的要求
   };
 
   // 打印文本並在前後插入兩個空白行
@@ -488,8 +336,6 @@ export const useTGP58Printer = () => {
     cutPaper,
     clearLog,
     printReport,
-    uploadText,
-    printReceipt,
     setDateTime,
     clearReceivedData,
     getFirmwareVersion,
