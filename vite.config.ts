@@ -54,7 +54,7 @@ export default defineConfig({
     })
   ],
   optimizeDeps: {
-    include: ["@rive-app/canvas"]
+    include: ["@rive-app/canvas", "jsprintmanager"]
   },
   /** 快捷路徑設定 */
   resolve: {
