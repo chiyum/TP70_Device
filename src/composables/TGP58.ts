@@ -1,8 +1,11 @@
 import {
   convertToHexArray,
   hexStringToUint8Array,
+  hexToByte,
   textToHex
 } from "@/utils/hexStringToUint8Array";
+
+const seelp = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // TGP58 串行端口配置
 const PORT_OPTIONS = {
@@ -193,6 +196,12 @@ export const useTGP58Printer = () => {
     return sendMessage("printReport", TGP58_COMMANDS.printReport);
   };
 
+  const setFormatReport = async (): Promise<void> => {
+    const hexText =
+      "33BB 20 01 20 01 20 01 20 01 20 01 20 01 20 01 74 B5 20 01 20 01 20 20 01 75 B6 20 01 B1";
+    await sendMessage("customCommend", hexText, hexToByte(hexText));
+  };
+
   // 設置日期時間
   const setDateTime = (dateTime: Date) => {
     const formattedDateTime = dateTime
@@ -258,15 +267,20 @@ export const useTGP58Printer = () => {
       1000: "31 30 30 30"
     };
     const hexText = amountsHex[amount];
-    console.log(hexText, "hexText");
     // 組合完整的命令
     const printCommand =
       TGP58_COMMANDS.printText +
       "B3" +
-      "20 20 20 20 20 20 20 20 20 20 20 20 20" +
+      `${[100, 200, 500].includes(amount) ? "20 " : ""}20 20 20 20 20 20 20 20 20` +
       hexText +
       "0D"; // 組合成打印命令
+    await printText("         WU88         ");
+    await seelp(1000);
     await sendMessage("printText", printCommand); // 發送命令到打印機
+    await seelp(1000);
+    await printText("         ----         ");
+    await seelp(1000);
+    await printReport();
     // await cutPaper();
   };
 
@@ -308,9 +322,8 @@ export const useTGP58Printer = () => {
   // 初始化 TGP58
   const initTGP58 = async () => {
     if (state.isConnected) {
-      const noncCommand = "33BC00"; // 設置為常開模式
-      await sendMessage("setNONC", noncCommand);
-      setDateTime(new Date());
+      await setFormatReport();
+      await seelp(1000);
     }
   };
 

@@ -41,8 +41,11 @@ export const textToHex = (text: string): string => {
 export default hexStringToUint8Array;
 
 export const hexToByte = (hexString) => {
+  // 首先移除所有空格
+  const cleanHexString = hexString.replace(/\s+/g, '');
+
   const byteArray = new Uint8Array(
-    hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
+    cleanHexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
   );
   return byteArray;
 };
