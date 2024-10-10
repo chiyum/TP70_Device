@@ -210,10 +210,18 @@ export const useTGP58Printer = () => {
     );
   };
 
+  const textToSpacedHex = (text: string): string => {
+    return Array.from(text)
+      .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0"))
+      .join(" ")
+      .toUpperCase();
+  };
+
   const printText = async (text): Promise<void> => {
     console.log(text, "printText");
-    const hexText = textToHex(text); // 將文本轉換為十六進制格式
-    const printCommand = TGP58_COMMANDS.printText + "B3" + hexText + "0D"; // 組合成打印命令
+    const hexText = textToSpacedHex(text); // 將文本轉換為十六進制格式
+    console.log(hexText);
+    const printCommand = TGP58_COMMANDS.printText + " B3 " + hexText + " 0D "; // 組合成打印命令
 
     await sendMessage("printText", printCommand); // 發送命令到打印機
   };
@@ -252,7 +260,12 @@ export const useTGP58Printer = () => {
     const hexText = amountsHex[amount];
     console.log(hexText, "hexText");
     // 組合完整的命令
-    const printCommand = TGP58_COMMANDS.printText + "B3" + hexText + "0D"; // 組合成打印命令
+    const printCommand =
+      TGP58_COMMANDS.printText +
+      "B3" +
+      "20 20 20 20 20 20 20 20 20 20 20 20 20" +
+      hexText +
+      "0D"; // 組合成打印命令
     await sendMessage("printText", printCommand); // 發送命令到打印機
     // await cutPaper();
   };
