@@ -2,7 +2,6 @@ import {
   convertToHexArray,
   hexStringToUint8Array,
   hexToByte,
-  textToHex,
   textToSpacedHex
 } from "@/utils/hexStringToUint8Array";
 
@@ -47,11 +46,7 @@ const TGP58_COMMANDS = {
   // 圖形相關
   uploadLogo: "1DF4", // 上傳商標
   printGraphics: "1DF8", // 打印圖形
-  printText: "1DF7", // 打印文本
-
-  // 其他控制命令
-  newLine: "0A", // 換行
-  advancePaper: "1B64" // 出紙
+  printText: "1DF7" // 打印文本
 };
 
 export const useTGP58Printer = () => {
@@ -73,13 +68,9 @@ export const useTGP58Printer = () => {
     reader: null as any
   });
 
-  // 計算連接狀態的徽章顏色
-  const badgeState = computed(() => {
-    return state.isConnected ? "green" : "red";
-  });
-
   // 處理來自 TGP58 的響應
   const onMessage = (hexs: string[]): void => {
+    console.log(hexs, "onMessage");
     const responseCode = hexs.join("");
     switch (responseCode) {
       case "06":
@@ -278,21 +269,6 @@ export const useTGP58Printer = () => {
       await seelp(500);
     }
   };
-  // 打印文本並在前後插入兩個空白行
-  const printWithPadding = async (text: string) => {
-    // 將文字轉換為十六進制
-    const hexText = textToHex(text);
-
-    // 構建命令：
-    // - 33BB 開頭（排版命令）
-    // - 空兩行：20 表示空白行，02 表示兩行
-    // - 文字：74 表示文字，00 表示置左
-    // - 再空兩行：20 表示空白行，02 表示兩行
-    const command = `${TGP58_COMMANDS.formatPrint}20027400${hexText}2002`;
-
-    // 發送命令到打印機
-    await sendMessage("formatPrint", command);
-  };
 
   // 清除接收數據
   const clearReceivedData = () => {
@@ -339,11 +315,9 @@ export const useTGP58Printer = () => {
   // 返回可用的函數和狀態
   return {
     state,
-    badgeState,
     connectSerial,
     printSimpleGraphic,
     printText,
-    printWithPadding,
     cutPaper,
     clearLog,
     printReport,

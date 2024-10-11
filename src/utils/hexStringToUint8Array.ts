@@ -1,3 +1,4 @@
+// 定義一個函式來將十六進制字符串轉換為 Uint8Array
 export const hexStringToUint8Array = (hexString: string): Uint8Array => {
   // 移除所有空格，並確保字符串長度為偶數
   hexString = hexString.replace(/\s/g, "");
@@ -32,14 +33,7 @@ export const convertToHexArray = (data: Uint8Array): string[] => {
   });
 };
 
-export const textToHex = (text: string): string => {
-  return Array.from(text)
-    .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0"))
-    .join("");
-};
-
-export default hexStringToUint8Array;
-
+// 定義一個函式來將十六進制字符串轉換為 Uint8Array
 export const hexToByte = (hexString) => {
   // 首先移除所有空格
   const cleanHexString = hexString.replace(/\s+/g, "");
@@ -50,9 +44,12 @@ export const hexToByte = (hexString) => {
   return byteArray;
 };
 
+// 將字串轉換為以空格分隔的十六進制字符串
 export const textToSpacedHex = (text: string): string => {
   return Array.from(text)
     .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0"))
     .join(" ")
     .toUpperCase();
 };
+
+export default hexStringToUint8Array;

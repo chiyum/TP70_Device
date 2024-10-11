@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTGP58Printer } from "@/composables/TGP58";
 
-const input = ref("請輸入文字檔");
+const input = ref("just only number or english");
 
 const {
   connectSerial,
@@ -10,7 +10,6 @@ const {
   printReport,
   clearReceivedData,
   getFirmwareVersion,
-  printWithPadding,
   getPrinterStatus,
   clearLog,
   wu88FormatCommend
@@ -32,11 +31,6 @@ const handleInputPrint = async () => {
   console.log("打印完成");
 };
 
-const handleInputPaddingPrint = async () => {
-  await printWithPadding(input.value);
-  console.log("打印完成");
-};
-
 const onUploadAmount = async (price: number) => {
   console.log(price, "price");
   await wu88FormatCommend(price);
@@ -46,19 +40,16 @@ const onUploadAmount = async (price: number) => {
 <template>
   <div class="gtp58test">
     <q-btn @click="connectSerial">連接印表機</q-btn>
+    <q-btn @click="clearLog">清除日誌</q-btn>
+    <q-btn @click="clearReceivedData">清除接收數據</q-btn>
     <q-btn @click="cutPaper">切紙</q-btn>
     <q-btn @click="printReport">打印報表</q-btn>
-    <q-btn @click="clearReceivedData">清除接收數據</q-btn>
     <q-btn @click="handleGetFirmwareVersion">獲取韌體版本</q-btn>
     <q-btn @click="handleGetPrinterStatus">獲取打印機狀態</q-btn>
-    <q-btn @click="handleInputPrint">打印輸入的文本</q-btn>
     <q-btn @click="onUploadAmount(100)">打印100</q-btn>
     <q-btn @click="onUploadAmount(500)">打印500</q-btn>
     <q-btn @click="onUploadAmount(1000)">打印1000</q-btn>
-    <q-btn @click="clearLog">清除日誌</q-btn>
-    <q-btn @click="handleInputPaddingPrint">
-      打印輸入的文本並在前後加空格
-    </q-btn>
+    <q-btn @click="handleInputPrint">打印輸入的文本</q-btn>
     <q-input outlined v-model="input" type="text" />
   </div>
 </template>
