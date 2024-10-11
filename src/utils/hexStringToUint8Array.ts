@@ -42,10 +42,17 @@ export default hexStringToUint8Array;
 
 export const hexToByte = (hexString) => {
   // 首先移除所有空格
-  const cleanHexString = hexString.replace(/\s+/g, '');
+  const cleanHexString = hexString.replace(/\s+/g, "");
 
   const byteArray = new Uint8Array(
     cleanHexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
   );
   return byteArray;
+};
+
+export const textToSpacedHex = (text: string): string => {
+  return Array.from(text)
+    .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0"))
+    .join(" ")
+    .toUpperCase();
 };

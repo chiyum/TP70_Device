@@ -2,7 +2,8 @@ import {
   convertToHexArray,
   hexStringToUint8Array,
   hexToByte,
-  textToHex
+  textToHex,
+  textToSpacedHex
 } from "@/utils/hexStringToUint8Array";
 
 const seelp = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,21 +16,6 @@ const PORT_OPTIONS = {
   parity: "none", // 奇偶校驗
   flowControl: "none" // 流控制
 };
-
-// const TEXT_ALIGN = {
-//   LEFT: 0,
-//   CENTER: 1,
-//   RIGHT: 2
-// };
-//
-// const FONT_SIZE = {
-//   NORMAL: 1, // 1x1
-//   TALL: 2, // 1x2
-//   LARGE: 3, // 2x2
-//   EXTRA_TALL: 4, // 2x4
-//   EXTRA_LARGE: 5, // 3x3
-//   HUGE: 6 // 3x6
-// };
 
 // TGP58 命令集
 const TGP58_COMMANDS = {
@@ -219,13 +205,6 @@ export const useTGP58Printer = () => {
     );
   };
 
-  const textToSpacedHex = (text: string): string => {
-    return Array.from(text)
-      .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0"))
-      .join(" ")
-      .toUpperCase();
-  };
-
   const printText = async (text): Promise<void> => {
     console.log(text, "printText");
     const hexText = textToSpacedHex(text); // 將文本轉換為十六進制格式
@@ -275,11 +254,11 @@ export const useTGP58Printer = () => {
       hexText +
       "0D"; // 組合成打印命令
     await printText("         WU88         ");
-    await seelp(1000);
+    await seelp(500);
     await sendMessage("printText", printCommand); // 發送命令到打印機
-    await seelp(1000);
+    await seelp(500);
     await printText("         ----         ");
-    await seelp(1000);
+    await seelp(500);
     await printReport();
     // await cutPaper();
   };
@@ -323,18 +302,10 @@ export const useTGP58Printer = () => {
   const initTGP58 = async () => {
     if (state.isConnected) {
       await setFormatReport();
-      await seelp(1000);
     }
   };
 
   // 以下是不會回傳資料的函數 機器不會有反應
-
-  // 出紙
-  const advancePaper = async (lines: number = 3) => {
-    const command =
-      TGP58_COMMANDS.advancePaper + lines.toString(16).padStart(2, "0");
-    await sendMessage("advancePaper", command);
-  };
 
   // 發送圖形數據到列印機
   const printSimpleGraphic = async () => {
@@ -354,7 +325,6 @@ export const useTGP58Printer = () => {
   return {
     state,
     badgeState,
-    advancePaper,
     connectSerial,
     printSimpleGraphic,
     printText,
