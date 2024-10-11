@@ -257,7 +257,7 @@ export const useTGP58Printer = () => {
     const printCommand =
       TGP58_COMMANDS.printText +
       FONT_SIZE["4"] +
-      `${[100, 200, 500].includes(amount) ? "20 " : ""}20 20 20 20 20 20 20 20 20` +
+      `${[100, 200, 500].includes(amount) ? "20 " : ""}20 20 20 20 20 20 20 20 24` +
       hexText +
       "0D"; // 組合成打印命令
     await advancePaper(3);
