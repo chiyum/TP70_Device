@@ -17,6 +17,15 @@ const PORT_OPTIONS = {
   flowControl: "none" // 流控制
 };
 
+const FONT_SIZE = {
+  1: "B1", //1x1
+  2: "B2", //1x2
+  3: "B3", //2x2
+  4: "B4", //2x4
+  5: "B5", //3x3
+  6: "B6" //3x6
+};
+
 // TGP58 命令集
 const TGP58_COMMANDS = {
   // 基本命令
@@ -28,13 +37,10 @@ const TGP58_COMMANDS = {
   printLog: "1BF9", // 打印日誌（與打印報表相同）
   getFirmwareVersion: "1BFB", // 獲取韌體版本
   getStatus: "1BFC", // 獲取打印機狀態
-
   // 格式化列印功能
-  formatPrint: "33BB", // 排版打印
-
+  formatPrint: "33BB", // 報表排版設置
   // 文字內容上傳
   uploadText: "33BD", // 上傳文本內容
-
   // NO/NC 選擇
   setNONC: "33BC", // 設置 NO/NC
 
@@ -209,7 +215,8 @@ export const useTGP58Printer = () => {
     console.log(text, "printText");
     const hexText = textToSpacedHex(text); // 將文本轉換為十六進制格式
     console.log(hexText);
-    const printCommand = TGP58_COMMANDS.printText + " B3 " + hexText + " 0D "; // 組合成打印命令
+    const printCommand =
+      TGP58_COMMANDS.printText + ` ${FONT_SIZE["5"]} ` + hexText + " 0D "; // 組合成打印命令
 
     await sendMessage("printText", printCommand); // 發送命令到打印機
   };
@@ -249,20 +256,28 @@ export const useTGP58Printer = () => {
     // 組合完整的命令
     const printCommand =
       TGP58_COMMANDS.printText +
-      "B3" +
+      FONT_SIZE["4"] +
       `${[100, 200, 500].includes(amount) ? "20 " : ""}20 20 20 20 20 20 20 20 20` +
       hexText +
       "0D"; // 組合成打印命令
-    await printText("         WU88         ");
+    await advancePaper(3);
+    await seelp(500);
+    await printText("   WU88 ONLY      ");
+    await seelp(500);
+    await printText("                      ");
     await seelp(500);
     await sendMessage("printText", printCommand); // 發送命令到打印機
-    await seelp(500);
-    await printText("         ----         ");
-    await seelp(500);
-    await printReport();
-    // await cutPaper();
+    await advancePaper(20);
+    // await printReport();
+    await cutPaper();
   };
 
+  const advancePaper = async (frequency: number): Promise<void> => {
+    for (let i = 0; i < frequency; i++) {
+      await printText("                      ");
+      await seelp(500);
+    }
+  };
   // 打印文本並在前後插入兩個空白行
   const printWithPadding = async (text: string) => {
     // 將文字轉換為十六進制
